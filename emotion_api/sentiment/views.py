@@ -123,8 +123,8 @@ def predict(sentence):
     # and then get the label with the highest probability
     pred_label = np.argmax(pred, axis=1)
     # we then return it
-    label_class_dict = {0: "sadness", 1: "fear",
-                        2: "anger", 3: "love", 4: "happy", 5: "surprise"}
+    label_class_dict = {0: 'sadness', 1: 'happy',
+                        2: 'love', 3: 'anger', 4: 'fear', 5: 'surprise'}
 
     return label_class_dict[pred_label[0]]
 
