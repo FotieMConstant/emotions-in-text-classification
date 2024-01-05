@@ -1,4 +1,4 @@
-# Emotions in Text Classification
+# Emotions in Text Classification with BERT
 
 This project aims to classify emotions in text using a DistilBERT-based model. It includes both a Jupyter notebook for training and a Django API for serving predictions.
 
