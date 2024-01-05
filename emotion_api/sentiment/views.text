@@ -1,0 +1,126 @@
+from transformers import BertTokenizer, TFBertModel, BertConfig, TFDistilBertModel, DistilBertTokenizer, DistilBertConfig
+from django.shortcuts import render
+
+# Create your views here.
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods
+
+
+# import the necessary libraries for ml
+import tensorflow as tf
+# import tensorflow_hub as hub
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import numpy as np
+import re
+import unicodedata
+from nltk.corpus import stopwords
+from tensorflow import keras
+from tensorflow.keras.layers import Dense, Dropout, Input
+# from tqdm import tqdm
+import pickle
+from sklearn.metrics import confusion_matrix, f1_score, classification_report
+import matplotlib.pyplot as plt
+from sklearn.utils import shuffle
+from tensorflow.keras import regularizers
+# importing stopwords
+import nltk
+nltk.download('stopwords')
+
+# Loading DistilBERT Tokenizer and the DistilBERT model
+dbert_tokenizer = DistilBertTokenizer.from_pretrained(
+    'distilbert-base-uncased')
+dbert_model = TFDistilBertModel.from_pretrained('distilbert-base-uncased')
+
+
+@csrf_exempt
+@require_POST
+# processing and cleaning functions
+def unicode_to_ascii(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
+
+def clean_stopwords_shortwords(w):
+    stopwords_list = stopwords.words('english')
+    words = w.split()
+    clean_words = [word for word in words if (
+        word not in stopwords_list) and len(word) > 2]
+    return " ".join(clean_words)
+
+
+def preprocess_sentence(w):
+    w = unicode_to_ascii(w.lower().strip())
+    w = re.sub(r"([?.!,¿])", r" ", w)
+    w = re.sub(r'[" "]+', " ", w)
+    w = re.sub(r"[^a-zA-Z?.!,¿]+", " ", w)
+    w = clean_stopwords_shortwords(w)
+    w = re.sub(r'@\w+', '', w)
+    return w
+
+
+# Set the maximum length of the input sentences
+max_len = 32
+num_classes = 6  # number of classes in our dataset
+log_dir = 'dbert_model'
+model_save_path = '../../dbert_model.h5'
+
+# now we try to predict the label of a random sentence from user
+
+
+def create_model():
+    inps = Input(shape=(max_len,), dtype='int64')
+    masks = Input(shape=(max_len,), dtype='int64')
+    dbert_layer = dbert_model(inps, attention_mask=masks)[0][:, 0, :]
+    dense = Dense(512, activation='relu',
+                  kernel_regularizer=regularizers.l2(0.01))(dbert_layer)
+    dropout = Dropout(0.5)(dense)
+    pred = Dense(num_classes, activation='softmax',
+                 kernel_regularizer=regularizers.l2(0.01))(dropout)
+    model = tf.keras.Model(inputs=[inps, masks], outputs=pred)
+    print(model.summary())
+    return model
+
+
+loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+metric = tf.keras.metrics.SparseCategoricalAccuracy('accuracy')
+optimizer = tf.keras.optimizers.Adam(learning_rate=3e-5)
+
+trained_model = create_model()
+trained_model.compile(loss=loss, optimizer=optimizer, metrics=[metric])
+trained_model.load_weights(model_save_path)  # loading the model
+
+
+def predict(sentence):
+    # we first preprocess the sentence
+    sentence = preprocess_sentence(sentence)
+    # then we do some tokenization on the sentence
+    dbert_inps = dbert_tokenizer.encode_plus(
+        sentence, add_special_tokens=True, max_length=max_len, pad_to_max_length=True, return_attention_mask=True, truncation=True)
+    # then we convert to numpy array
+    id_inp = np.asarray(dbert_inps['input_ids'])
+    mask_inp = np.asarray(dbert_inps['attention_mask'])
+    # and predict the label using the trained model
+    pred = trained_model.predict(
+        [id_inp.reshape(1, -1), mask_inp.reshape(1, -1)])
+    # and then get the label with the highest probability
+    pred_label = np.argmax(pred, axis=1)
+    # we then return it
+    # return label_class_dict[pred_label[0]]
+    return pred_label
+
+
+def predict_sentiment(request):
+    try:
+        # Get the input text from the request
+        input_text = request.POST.get("text", "")
+
+        # Make a prediction using your BERT model
+        prediction = predict(input_text)
+
+        # Return the result as JSON
+        return JsonResponse({"prediction": prediction})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)})
