@@ -1,2 +1,42 @@
 dbert_model.h5
 tensorboard_visualization
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Static files
+dbert_model/
+
+# Media files
+media/
+
+# Secret key
+emotion_api/settings/secret_key.py
+
+# Local settings
+emotion_api/settings/local.py
+
+# Log files
+logs/
+*.log
+
+# Virtual environment
+venv/
+
+# IDE or editor settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+
+# Python Environments
+__pyenv_*/
+
+# macOS
+.DS_Store
